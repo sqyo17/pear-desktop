@@ -20,7 +20,9 @@ import {
   PlainLyrics,
 } from './components';
 
-import { currentLyrics } from './store';
+import { currentLyrics, lyricsStore } from './store';
+import { ipcSend } from './index';
+import { romanize } from './utils';
 
 import type { LineLyrics, SyncedLyricsPluginConfig } from '../types';
 
@@ -256,6 +258,53 @@ export const LyricsRenderer = () => {
     const index = statuses().findIndex((status) => status === 'current');
     if (index === -1) return;
     setCurrentIndex(index);
+  });
+
+  // notify backend of current lyric change
+  createEffect(() => {
+    const idx = currentIndex();
+    const lyrics = currentLyrics();
+    if (!lyrics?.data?.lines) return;
+    const line = lyrics.data.lines[idx];
+    if (!line) return;
+
+    (async () => {
+      try {
+        if (!ipcSend) return;
+
+        const provider = lyricsStore.provider;
+
+        // Prefer the romanization already shown in the UI (if any)
+        let romanized: string | undefined = undefined;
+        try {
+          const domRoman = document.querySelector('.synced-line.current .romaji')
+            ?.textContent
+            ?.trim();
+          if (domRoman) {
+            romanized = domRoman;
+          } else if (config()?.romanization && line.text) {
+            // fallback to computing romanization if UI hasn't rendered it
+            try {
+              romanized = await romanize(line.text);
+            } catch (e) {
+              // ignore
+            }
+          }
+        } catch (e) {
+          // ignore DOM access errors
+        }
+
+        ipcSend('synced-lyrics:current', {
+          index: idx,
+          line,
+          provider,
+          romanized,
+          timestamp: Date.now(),
+        });
+      } catch (e) {
+        // ignore
+      }
+    })();
   });
 
   createEffect(() => {

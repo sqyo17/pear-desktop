@@ -15,6 +15,7 @@ export let netFetch: (
   url: string,
   init?: RequestInit,
 ) => Promise<[number, string, Record<string, string>]>;
+export let ipcSend: (channel: string, ...args: any[]) => void;
 
 export const renderer = createRenderer<
   {
@@ -76,6 +77,7 @@ export const renderer = createRenderer<
 
   async start(ctx: RendererContext<SyncedLyricsPluginConfig>) {
     netFetch = ctx.ipc.invoke.bind(ctx.ipc, 'synced-lyrics:fetch');
+    ipcSend = ctx.ipc.send.bind(ctx.ipc);
 
     setConfig(await ctx.getConfig());
 
