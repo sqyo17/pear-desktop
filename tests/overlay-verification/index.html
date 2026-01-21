@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lyrics Overlay Prototype</title>
+    <style>
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        #lyrics-container {
+            text-align: center;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+        .line {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+            opacity: 0.5;
+            transition: all 0.3s ease;
+        }
+        .line.active {
+            font-size: 3rem;
+            opacity: 1;
+            color: #1db954;
+            text-shadow: 0 0 10px rgba(29, 185, 84, 0.5);
+        }
+        .romaji {
+            font-size: 1.2rem;
+            color: #aaa;
+            display: block;
+            margin-top: 0.2rem;
+        }
+        #status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            font-size: 0.8rem;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div id="status">Disconnected</div>
+    <div id="lyrics-container">
+        <div class="line active" id="current-line">Waiting for lyrics...</div>
+    </div>
+
+    <script>
+        const PORT = 26538; // Default port
+        const WS_URL = `ws://localhost:${PORT}/api/v1/ws`;
+
+        // Simple auth handling could be added here if needed
+        // For now, assuming AuthStrategy.NONE or dealing with 401 manually if browser prompts
+        
+        let socket;
+
+        function connect() {
+            console.log('Connecting to', WS_URL);
+            socket = new WebSocket(WS_URL);
+
+            socket.onopen = () => {
+                document.getElementById('status').textContent = 'Connected';
+                document.getElementById('status').style.color = '#1db954';
+                console.log('Connected');
+            };
+
+            socket.onclose = () => {
+                document.getElementById('status').textContent = 'Disconnected (Retrying...)';
+                document.getElementById('status').style.color = 'red';
+                console.log('Disconnected');
+                setTimeout(connect, 3000);
+            };
+
+            socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('Message:', data);
+
+                    if (data.type === 'LYRICS_CHANGED' && data.lyric) {
+                        updateLyrics(data.lyric);
+                    } else if (data.type === 'PLAYER_INFO' && data.lyric) {
+                         // Initial state might have lyrics? Check backend struct
+                         // Backend sends lastLyrics separately on open if available
+                    }
+                } catch (e) {
+                    console.error('Error parsing message', e);
+                }
+            };
+        }
+
+        function updateLyrics(lyric) {
+            const container = document.getElementById('lyrics-container');
+            const lineEl = document.getElementById('current-line');
+            
+            // Animate transition 
+            lineEl.style.opacity = '0';
+            
+            setTimeout(() => {
+                lineEl.innerHTML = lyric.text + (lyric.romanized ? `<span class="romaji">${lyric.romanized}</span>` : '');
+                lineEl.style.opacity = '1';
+            }, 100);
+        }
+
+        connect();
+    </script>
+</body>
+</html>
