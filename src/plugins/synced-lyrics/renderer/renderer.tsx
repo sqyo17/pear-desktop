@@ -134,13 +134,13 @@ type LyricsRendererChild =
   | { kind: 'NotFoundKaomoji' }
   | { kind: 'Error'; error: Error }
   | {
-      kind: 'SyncedLine';
-      line: LineLyrics;
-    }
+    kind: 'SyncedLine';
+    line: LineLyrics;
+  }
   | {
-      kind: 'PlainLine';
-      line: string;
-    };
+    kind: 'PlainLine';
+    line: string;
+  };
 
 const lyricsPicker: LyricsRendererChild = { kind: 'LyricsPicker' };
 
@@ -264,13 +264,20 @@ export const LyricsRenderer = () => {
   createEffect(() => {
     const idx = currentIndex();
     const lyrics = currentLyrics();
-    if (!lyrics?.data?.lines) return;
+
+    if (!lyrics?.data?.lines) {
+      return;
+    }
     const line = lyrics.data.lines[idx];
-    if (!line) return;
+    if (!line) {
+      return;
+    }
 
     (async () => {
       try {
-        if (!ipcSend) return;
+        if (!ipcSend) {
+          return;
+        }
 
         const provider = lyricsStore.provider;
 
@@ -294,13 +301,16 @@ export const LyricsRenderer = () => {
           // ignore DOM access errors
         }
 
-        ipcSend('synced-lyrics:current', {
+        // Sanitize the payload to remove any proxies or non-clonable objects
+        const safePayload = JSON.parse(JSON.stringify({
           index: idx,
           line,
           provider,
           romanized,
           timestamp: Date.now(),
-        });
+        }));
+
+        ipcSend('synced-lyrics:current', safePayload);
       } catch (e) {
         // ignore
       }
