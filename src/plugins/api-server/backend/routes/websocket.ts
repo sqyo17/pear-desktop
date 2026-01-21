@@ -197,16 +197,6 @@ export const register = (
   };
 
   ipc.on('synced-lyrics:current', (payload: any) => {
-    try {
-      // eslint-disable-next-line no-console
-      console.debug('api-server:received-synced-lyrics', {
-        provider: payload?.provider ?? null,
-        romanized: payload?.romanized ?? null,
-        idx: payload?.index ?? null,
-      });
-    } catch (e) {
-      // ignore
-    }
     const normalized = normalizeLyric(payload, lastSongInfo ?? undefined);
     if (!normalized) return;
 
