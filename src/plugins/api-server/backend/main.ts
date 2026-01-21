@@ -170,21 +170,21 @@ export const backend = createBackend<BackendType, APIServerConfig>({
       const serveOptions =
         config.useHttps && config.certPath && config.keyPath
           ? {
-              fetch: this.app.fetch.bind(this.app),
-              port: config.port,
-              hostname: config.hostname,
-              createServer: createHttpsServer,
-              serverOptions: {
-                key: readFileSync(config.keyPath),
-                cert: readFileSync(config.certPath),
-              },
-            }
+            fetch: this.app.fetch.bind(this.app),
+            port: config.port,
+            hostname: config.hostname,
+            createServer: createHttpsServer,
+            serverOptions: {
+              key: readFileSync(config.keyPath),
+              cert: readFileSync(config.certPath),
+            },
+          }
           : {
-              fetch: this.app.fetch.bind(this.app),
-              port: config.port,
-              hostname: config.hostname,
-              createServer: createHttpServer,
-            };
+            fetch: this.app.fetch.bind(this.app),
+            port: config.port,
+            hostname: config.hostname,
+            createServer: createHttpServer,
+          };
 
       this.server = serve(serveOptions);
 
