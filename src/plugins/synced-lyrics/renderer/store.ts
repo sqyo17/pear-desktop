@@ -10,8 +10,10 @@ import {
 } from '../providers';
 import { providers } from '../providers/renderer';
 
-import type { LyricProvider } from '../types';
+import type { LyricProvider, OriginalSongMapping } from '../types';
 import type { SongInfo } from '@/providers/song-info';
+import { config } from './renderer';
+import type { SyncedLyricsPluginConfig } from '../types';
 
 type LyricsStore = {
   provider: ProviderName;
@@ -51,7 +53,107 @@ interface SearchCache {
 
 // TODO: Maybe use localStorage for the cache.
 const searchCache = new Map<VideoId, SearchCache>();
+
+/** Remote mappings cache (merged from URL) */
+let remoteMappings: Record<string, OriginalSongMapping> = {};
+/** Interval ID for auto-refresh */
+let refreshIntervalId: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Fetch remote mappings from the configured URL
+ */
+export const fetchRemoteMappings = async (): Promise<void> => {
+  const cfg = config();
+  const url = cfg?.mappingUrl;
+  if (!url) return;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.warn(`[synced-lyrics] Failed to fetch remote mappings: ${response.status}`);
+      return;
+    }
+
+    const data = await response.json();
+
+    // Validate that data is an object with string keys
+    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+      console.warn('[synced-lyrics] Invalid remote mappings format');
+      return;
+    }
+
+    remoteMappings = data as Record<string, OriginalSongMapping>;
+    console.log(`[synced-lyrics] Loaded ${Object.keys(remoteMappings).length} remote mappings`);
+  } catch (error) {
+    console.error('[synced-lyrics] Error fetching remote mappings:', error);
+  }
+};
+
+/**
+ * Start auto-refresh of remote mappings
+ */
+export const startRemoteMappingRefresh = (): void => {
+  const cfg = config();
+  const interval = cfg?.mappingUrlRefreshInterval;
+  const url = cfg?.mappingUrl;
+
+  // Clear existing interval
+  if (refreshIntervalId) {
+    clearInterval(refreshIntervalId);
+    refreshIntervalId = null;
+  }
+
+  // Don't start if no URL or interval is 0/disabled
+  if (!url || !interval || interval <= 0) {
+    return;
+  }
+
+  // Initial fetch
+  fetchRemoteMappings();
+
+  // Set up interval
+  refreshIntervalId = setInterval(() => {
+    fetchRemoteMappings();
+  }, interval * 1000);
+};
+
+/**
+ * Stop auto-refresh of remote mappings
+ */
+export const stopRemoteMappingRefresh = (): void => {
+  if (refreshIntervalId) {
+    clearInterval(refreshIntervalId);
+    refreshIntervalId = null;
+  }
+};
+
+/**
+ * Get all mappings (remote + local, local takes precedence)
+ */
+const getAllMappings = (): Record<string, OriginalSongMapping> => {
+  const localMappings = config()?.originalSongMapping || {};
+  return { ...remoteMappings, ...localMappings };
+};
+
+/**
+ * Apply original song mapping if configured.
+ * Returns a modified SearchSongInfo with original artist/title for cover songs.
+ */
+const applyMapping = (info: SongInfo): SongInfo => {
+  const allMappings = getAllMappings();
+  const mapping = allMappings[info.videoId];
+  if (!mapping) return info;
+
+  return {
+    ...info,
+    artist: mapping.artist,
+    ...(mapping.title && { title: mapping.title }),
+  };
+};
+
 export const fetchLyrics = (info: SongInfo) => {
+  // Apply mapping for cover songs before searching
+  const searchInfo = applyMapping(info);
   if (searchCache.has(info.videoId)) {
     const cache = searchCache.get(info.videoId)!;
 
@@ -98,7 +200,7 @@ export const fetchLyrics = (info: SongInfo) => {
 
     tasks.push(
       provider
-        .search(info)
+        .search(searchInfo)
         .then((res) => {
           pCache.state = 'done';
           pCache.data = res;
@@ -154,8 +256,10 @@ export const retrySearch = (provider: ProviderName, info: SongInfo) => {
     };
   });
 
+  const searchInfo = applyMapping(info);
+
   providers[provider]
-    .search(info)
+    .search(searchInfo)
     .then((res) => {
       setLyricsStore('lyrics', (old) => {
         return {

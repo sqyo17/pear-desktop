@@ -22,6 +22,9 @@ export default createPlugin({
     defaultTextString: '♪',
     lineEffect: 'fancy',
     romanization: true,
+    originalSongMapping: {},
+    mappingUrl: undefined,
+    mappingUrlRefreshInterval: 3600, // 1 hour default
   } satisfies SyncedLyricsPluginConfig as SyncedLyricsPluginConfig,
 
   menu,

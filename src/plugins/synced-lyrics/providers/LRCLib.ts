@@ -27,6 +27,34 @@ export class LRCLib implements LyricProvider {
       query.delete('album_name');
     }
 
+    // Try /api/get first - it returns the single best match (often with synced lyrics)
+    let getUrl = `${this.baseUrl}/api/get?${query.toString()}`;
+    let getResponse = await fetch(getUrl);
+
+    if (getResponse.ok) {
+      const getData = await getResponse.json();
+      if (getData && !getData.instrumental && (getData.syncedLyrics || getData.plainLyrics)) {
+        // Check duration match (with more lenient tolerance for /api/get results)
+        if (!songDuration || Math.abs(getData.duration - songDuration) <= 30) {
+          const raw = getData.syncedLyrics;
+          const plain = getData.plainLyrics;
+
+          return {
+            title: getData.trackName,
+            artists: getData.artistName.split(/[&,]/g),
+            lines: raw
+              ? LRC.parse(raw).lines.map((l) => ({
+                  ...l,
+                  status: 'upcoming' as const,
+                }))
+              : undefined,
+            lyrics: plain,
+          };
+        }
+      }
+    }
+
+    // Fall back to /api/search for more options
     let url = `${this.baseUrl}/api/search?${query.toString()}`;
     let response = await fetch(url);
 

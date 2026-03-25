@@ -3,7 +3,7 @@ import { waitForElement } from '@/utils/wait-for-element';
 
 import { selectors, tabStates } from './utils';
 import { setConfig, setCurrentTime } from './renderer';
-import { fetchLyrics } from './store';
+import { fetchLyrics, startRemoteMappingRefresh, stopRemoteMappingRefresh } from './store';
 
 import type { RendererContext } from '@/types/contexts';
 import type { MusicPlayer } from '@/types/music-player';
@@ -28,6 +28,9 @@ export const renderer = createRenderer<
 >({
   onConfigChange(newConfig) {
     setConfig(newConfig);
+    // Restart remote mapping refresh when config changes
+    stopRemoteMappingRefresh();
+    startRemoteMappingRefresh();
   },
 
   observerCallback(mutations: MutationRecord[]) {
@@ -80,6 +83,9 @@ export const renderer = createRenderer<
     ipcSend = ctx.ipc.send.bind(ctx.ipc);
 
     setConfig(await ctx.getConfig());
+
+    // Start fetching remote mappings if configured
+    startRemoteMappingRefresh();
 
     ctx.ipc.on('peard:update-song-info', (info: SongInfo) => {
       fetchLyrics(info);
