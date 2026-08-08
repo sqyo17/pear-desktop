@@ -1,5 +1,5 @@
-import type { SongInfo } from '@/providers/song-info';
 import type { ProviderName } from './providers';
+import type { SongInfo } from '@/providers/song-info';
 
 export type OriginalSongMapping = {
   artist: string;
@@ -21,6 +21,10 @@ export type SyncedLyricsPluginConfig = {
   mappingUrl?: string;
   /** How often to refresh remote mappings (in seconds, 0 = disable) */
   mappingUrlRefreshInterval?: number;
+  convertChineseCharacter?:
+    | 'simplifiedToTraditional'
+    | 'traditionalToSimplified'
+    | 'disabled';
 };
 
 export type LineLyricsStatus = 'previous' | 'current' | 'upcoming';
